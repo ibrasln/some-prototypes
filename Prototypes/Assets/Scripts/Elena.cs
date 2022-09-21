@@ -34,10 +34,15 @@ public class Elena : MonoBehaviour
     [SerializeField] float attackLeapTime;
     bool isAttacking;
 
+    [Header("Wall Slide")]
+    [SerializeField] float gravity;
+    [SerializeField] bool onWall;
+
     Rigidbody2D rb;
     Animator anim;
     CapsuleCollider2D bodyCol;
     BoxCollider2D feetCol;
+    BoxCollider2D wallSlideCol;
 
     private void Awake()
     {
@@ -45,6 +50,7 @@ public class Elena : MonoBehaviour
         anim = GetComponent<Animator>();
         bodyCol = GetComponent<CapsuleCollider2D>();
         feetCol = GetComponent<BoxCollider2D>();
+        wallSlideCol = GetComponentInChildren<BoxCollider2D>();
     }
 
     private void Start()
@@ -93,14 +99,17 @@ public class Elena : MonoBehaviour
 
     void OnAttack(InputValue value)
     {
+        if (!onGround) return;
         if (isDashing) anim.SetTrigger("DashAttack");
-        else anim.SetTrigger("FirstAttack");
+        else anim.SetTrigger("Attack");
         StartCoroutine(AttackLeapCoroutine());
     }
 
     void OnJump(InputValue value)
     {
-        bool onGround = feetCol.IsTouchingLayers(LayerMask.GetMask("Ground"));
+        anim.ResetTrigger("Attack");
+        anim.ResetTrigger("DashAttack");
+        onGround = feetCol.IsTouchingLayers(LayerMask.GetMask("Ground"));
         if (!onGround) return;
         if (value.isPressed)
         {
@@ -127,7 +136,6 @@ public class Elena : MonoBehaviour
             StartCoroutine(SlideCoroutine());
         }
     }
-
     #endregion
 
     void Movement()
@@ -191,16 +199,21 @@ public class Elena : MonoBehaviour
     IEnumerator AttackLeapCoroutine()
     {
         isAttacking = true;
-        movementFreezeTimer = .4f;
+        movementFreezeTimer = .6f;
         Vector2 attackLeap = transform.localScale.x * attackLeapPower * transform.right;
 
         float attackLeapStartTime = Time.time;
         while (Time.time < attackLeapStartTime + attackLeapTime)
         {
-            rb.velocity = Vector2.zero;
+            rb.velocity = new(0f, rb.velocity.y);
             transform.Translate(attackLeap * Time.deltaTime);
             yield return null;
         }
+    }
+
+    void WallSlide()
+    {
+
     }
 
 }
