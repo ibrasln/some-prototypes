@@ -2350,7 +2350,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 637014308}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.82, y: 7.41, z: 0}
+  m_LocalPosition: {x: -8.82, y: 0.57, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2373,6 +2373,15 @@ MonoBehaviour:
   jumpPower: 15
   dashPower: 10
   dashTime: 0.3
+  dashCooldown: 1.5
+  canDash: 0
+  isDashing: 0
+  slidePower: 8
+  slideTime: 0.25
+  slideCooldown: 1.5
+  canSlide: 0
+  isSliding: 0
+  movementFreezeTimer: 0
   attackLeapPower: 1
   attackLeapTime: 0.1
 --- !u!70 &637014315
