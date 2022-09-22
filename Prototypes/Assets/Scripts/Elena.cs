@@ -43,6 +43,10 @@ public class Elena : MonoBehaviour
     [SerializeField] float movementFreezeTimer;
     [SerializeField] float attackLeapPower;
     [SerializeField] float attackLeapTime;
+    [SerializeField] int attackAmount = 1;
+    [SerializeField] float attackCooldown;
+    [SerializeField] float attackCooldownCounter;
+    int attackAmountLeft;
     bool isAttacking;
 
     [Header("Wall Slide")]
@@ -67,6 +71,7 @@ public class Elena : MonoBehaviour
     {
         canDash = true;
         canSlide = true;
+        attackAmountLeft = attackAmount;
         wallJumpDirection.Normalize();
     }
 
@@ -74,6 +79,8 @@ public class Elena : MonoBehaviour
     {
         CheckIfCanDash();
         CheckIfCanSlide();
+
+        attackCooldownCounter -= Time.deltaTime;
 
         if (isAttacking)
         {
@@ -120,10 +127,22 @@ public class Elena : MonoBehaviour
 
     void OnAttack(InputValue value)
     {
-        if (!onGround) return;
-        if (isDashing) anim.SetTrigger("DashAttack");
-        else anim.SetTrigger("Attack");
-        StartCoroutine(AttackLeapCoroutine());
+        if (!onGround || attackCooldownCounter > 0) return;
+
+        if (value.isPressed)
+        {
+            if (isDashing) anim.SetTrigger("DashAttack");
+            else
+            {
+                attackCooldownCounter = attackCooldown;
+                Debug.Log(attackAmountLeft);
+                anim.SetTrigger("Attack");
+                anim.SetFloat("attackAmount", attackAmountLeft);
+                attackAmountLeft++;
+                if (attackAmountLeft > 2) attackAmountLeft = attackAmount; 
+            }
+            StartCoroutine(AttackLeapCoroutine());
+        }
     }
 
     void OnJump(InputValue value)
@@ -303,7 +322,7 @@ public class Elena : MonoBehaviour
     IEnumerator AttackLeapCoroutine()
     {
         isAttacking = true;
-        movementFreezeTimer = .6f;
+        movementFreezeTimer = .35f;
         Vector2 attackLeap = transform.localScale.x * attackLeapPower * transform.right;
 
         float attackLeapStartTime = Time.time;
