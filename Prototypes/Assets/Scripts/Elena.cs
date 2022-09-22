@@ -7,10 +7,21 @@ public class Elena : MonoBehaviour
     [Header("Movement")]
     [SerializeField] float movementSpeed;
     Vector2 moveInput;
-    
+    bool isFacingRight;
+
     [Header("Jump")]
     [SerializeField] float jumpPower;
-    bool onGround;
+    [SerializeField] LayerMask whatIsGround;
+    [SerializeField] Transform groundCheck;
+    [SerializeField] float groundCheckRadius;
+    [SerializeField] bool onGround;
+    [SerializeField] int amountOfJumps = 2;
+    [SerializeField] Vector2 wallJumpDirection;
+    [SerializeField] float wallJumpForce;
+    [SerializeField] float movementForceInAir;
+    [SerializeField] float airDragMultiplier;
+    float amountOfJumpsLeft;
+    bool canJump;
 
     [Header("Dash")]
     [SerializeField] float dashPower;
@@ -35,32 +46,34 @@ public class Elena : MonoBehaviour
     bool isAttacking;
 
     [Header("Wall Slide")]
-    [SerializeField] float gravity;
+    [SerializeField] Transform wallCheck;
+    [SerializeField] float wallCheckDistance;
+    [SerializeField] float wallSlideSpeed;
     [SerializeField] bool onWall;
+    [SerializeField] bool isWallSliding;
+    bool isWallTouched;
 
     Rigidbody2D rb;
     Animator anim;
-    CapsuleCollider2D bodyCol;
-    BoxCollider2D feetCol;
-    BoxCollider2D wallSlideCol;
+    CapsuleCollider2D col;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
-        bodyCol = GetComponent<CapsuleCollider2D>();
-        feetCol = GetComponent<BoxCollider2D>();
-        wallSlideCol = GetComponentInChildren<BoxCollider2D>();
+        col = GetComponent<CapsuleCollider2D>();
     }
 
     private void Start()
     {
         canDash = true;
         canSlide = true;
+        wallJumpDirection.Normalize();
     }
 
     private void Update()
     {
+
         if (!canDash)
         {
             dashCooldownCounter -= Time.deltaTime;
@@ -72,8 +85,6 @@ public class Elena : MonoBehaviour
             if (slideCooldownCounter <= 0) canSlide = true;
         }
 
-
-        anim.SetBool("isAttacking", isAttacking);
         if (isAttacking)
         {
             movementFreezeTimer -= Time.deltaTime;
@@ -84,11 +95,31 @@ public class Elena : MonoBehaviour
             else isAttacking = false;
         }
 
-
         Movement();
         Flip();
-        anim.SetBool("Fall", IsFalling());
+        CheckIfCanJump();
+        CheckIfWallSliding();
+        UpdateAnimations();
+    }
 
+    private void FixedUpdate()
+    {
+        CheckSurroundings();
+    }
+
+    void UpdateAnimations()
+    {
+        anim.SetBool("isRunning", IsRunning());
+        anim.SetBool("onGround", onGround);
+        anim.SetFloat("yVelocity", rb.velocity.y);
+        anim.SetBool("isWallSliding", isWallSliding);
+    }
+
+    void CheckSurroundings()
+    {
+        onGround = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, whatIsGround);
+        if (isFacingRight) onWall = Physics2D.Raycast(wallCheck.position, transform.right, wallCheckDistance, whatIsGround);
+        else onWall = Physics2D.Raycast(wallCheck.position, transform.right, -wallCheckDistance, whatIsGround);
     }
 
     #region Input System
@@ -107,21 +138,32 @@ public class Elena : MonoBehaviour
 
     void OnJump(InputValue value)
     {
-        anim.ResetTrigger("Attack");
-        anim.ResetTrigger("DashAttack");
-        onGround = feetCol.IsTouchingLayers(LayerMask.GetMask("Ground"));
-        if (!onGround) return;
-        if (value.isPressed)
+        
+        if (value.isPressed && canJump)
         {
-            Debug.Log("Pressed Jmup");
-            rb.velocity = new(rb.velocity.x, jumpPower);
-            anim.SetTrigger("Jump");
+            anim.ResetTrigger("Attack");
+            anim.ResetTrigger("DashAttack");
+
+            amountOfJumpsLeft--;
+
+            if (!isWallSliding)
+            {
+                Debug.Log("Jump from Ground");
+                rb.velocity = new(rb.velocity.x, jumpPower);
+            }
+
+            if ((onWall || isWallSliding) && moveInput.x != 0)
+            {
+                Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * moveInput.x, wallJumpForce * wallJumpDirection.y);
+                rb.AddForce(forceToAdd, ForceMode2D.Impulse);
+                isWallSliding = false;
+            }
         }
     }
 
     void OnDash(InputValue value)
     {
-        canDash = IsMoving() && onGround && !isSliding && dashCooldownCounter <= 0;
+        canDash = IsRunning() && onGround && !isSliding && dashCooldownCounter <= 0;
         if (value.isPressed && canDash)
         {
             StartCoroutine(DashCoroutine());
@@ -130,7 +172,7 @@ public class Elena : MonoBehaviour
 
     void OnSlide(InputValue value)
     {
-        canSlide = IsMoving() && onGround && !isDashing && slideCooldownCounter <= 0;
+        canSlide = IsRunning() && onGround && !isDashing && slideCooldownCounter <= 0;
         if (value.isPressed && canSlide) 
         {
             StartCoroutine(SlideCoroutine());
@@ -138,26 +180,67 @@ public class Elena : MonoBehaviour
     }
     #endregion
 
+    private void CheckIfCanJump()
+    {
+        if ((onGround && rb.velocity.y <= 0) || isWallSliding)
+        {
+            amountOfJumpsLeft = amountOfJumps;
+        }
+
+        if (amountOfJumpsLeft <= 0) canJump = false;
+        else canJump = true;
+
+    }
+
+    void CheckIfWallSliding()
+    {
+        if (onWall && !onGround && rb.velocity.y < 0)
+        {
+            isWallSliding = true;
+        }
+        else isWallSliding = false;
+    }
+
     void Movement()
     {
-        rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
-        anim.SetBool("isRunning", IsMoving());
+        if (onGround) rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
+        else if (!onGround && !isWallSliding && moveInput.x != 0)
+        {
+            Vector2 forceToAdd = new(movementForceInAir * moveInput.x, 0);
+            rb.AddForce(forceToAdd);
+
+            if (Mathf.Abs(rb.velocity.x) > movementSpeed)
+            {
+                rb.velocity = new Vector2(movementSpeed * moveInput.x, rb.velocity.y);
+            }
+        }
+        else if (!onGround && !isWallSliding && moveInput.x == 0)
+        {
+            rb.velocity = new Vector2(rb.velocity.x * airDragMultiplier, rb.velocity.y);
+        }
+        if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
     }
 
     void Flip()
     {
-        if (IsMoving()) transform.localScale = new Vector2(Mathf.Sign(rb.velocity.x), 1f);
+        if (!isWallSliding)
+        {
+            if (moveInput.x < 0)
+            {
+                isFacingRight = false;
+                transform.localScale = new(-1, 1, 1);
+            }
+            else if (moveInput.x > 0)
+            {
+                isFacingRight = true;
+                transform.localScale = new(1, 1, 1);
+            }
+        }
     }
 
-    bool IsMoving()
+    bool IsRunning()
     {
         return Mathf.Abs(rb.velocity.x) > Mathf.Epsilon;
-    }
-
-    bool IsFalling()
-    {
-        onGround = feetCol.IsTouchingLayers(LayerMask.GetMask("Ground"));
-        return !onGround && rb.velocity.y <= Mathf.Epsilon;
     }
 
     IEnumerator DashCoroutine()
@@ -211,9 +294,9 @@ public class Elena : MonoBehaviour
         }
     }
 
-    void WallSlide()
+    private void OnDrawGizmosSelected()
     {
-
+        Gizmos.DrawSphere(groundCheck.position, groundCheckRadius);
+        Gizmos.DrawLine(wallCheck.position, new Vector3(wallCheck.position.x + wallCheckDistance, wallCheck.position.y, wallCheck.position.z));
     }
-
 }
