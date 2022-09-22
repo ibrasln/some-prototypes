@@ -73,17 +73,8 @@ public class Elena : MonoBehaviour
 
     private void Update()
     {
-
-        if (!canDash)
-        {
-            dashCooldownCounter -= Time.deltaTime;
-            if (dashCooldownCounter <= 0) canDash = true;
-        }
-        else if (!canSlide)
-        {
-            slideCooldownCounter -= Time.deltaTime;
-            if (slideCooldownCounter <= 0) canSlide = true;
-        }
+        CheckIfCanDash();
+        CheckIfCanSlide();
 
         if (isAttacking)
         {
@@ -98,7 +89,7 @@ public class Elena : MonoBehaviour
         Movement();
         Flip();
         CheckIfCanJump();
-        CheckIfWallSliding();
+        CheckIfCanWallSliding();
         UpdateAnimations();
     }
 
@@ -180,7 +171,7 @@ public class Elena : MonoBehaviour
     }
     #endregion
 
-    private void CheckIfCanJump()
+    void CheckIfCanJump()
     {
         if ((onGround && rb.velocity.y <= 0) || isWallSliding)
         {
@@ -192,7 +183,31 @@ public class Elena : MonoBehaviour
 
     }
 
-    void CheckIfWallSliding()
+    void CheckIfCanDash()
+    {
+        if (!canDash)
+        {
+            dashCooldownCounter -= Time.deltaTime;
+            if (dashCooldownCounter <= 0)
+            {
+                canDash = true;
+            }
+        }
+    }
+
+    void CheckIfCanSlide()
+    {
+        if (!canSlide)
+        {
+            slideCooldownCounter -= Time.deltaTime;
+            if (slideCooldownCounter <= 0)
+            {
+                canSlide = true;
+            }
+        }
+    }
+
+    void CheckIfCanWallSliding()
     {
         if (onWall && !onGround && rb.velocity.y < 0)
         {
