@@ -143,7 +143,7 @@ public class Elena : MonoBehaviour
                 rb.velocity = new(rb.velocity.x, jumpPower);
             }
 
-            if ((onWall || isWallSliding) && moveInput.x != 0)
+            if ((onWall || isWallSliding) && !onGround && moveInput.x != 0)
             {
                 Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * moveInput.x, wallJumpForce * wallJumpDirection.y);
                 rb.AddForce(forceToAdd, ForceMode2D.Impulse);
@@ -173,7 +173,7 @@ public class Elena : MonoBehaviour
 
     void CheckIfCanJump()
     {
-        if ((onGround && rb.velocity.y <= 0) || isWallSliding)
+        if (onGround || isWallSliding)
         {
             amountOfJumpsLeft = amountOfJumps;
         }
