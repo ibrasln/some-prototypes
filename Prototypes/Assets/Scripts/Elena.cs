@@ -51,7 +51,6 @@ public class Elena : MonoBehaviour
     [SerializeField] float wallSlideSpeed;
     [SerializeField] bool onWall;
     [SerializeField] bool isWallSliding;
-    bool isWallTouched;
 
     Rigidbody2D rb;
     Animator anim;
@@ -129,13 +128,10 @@ public class Elena : MonoBehaviour
 
     void OnJump(InputValue value)
     {
-        
         if (value.isPressed && canJump)
         {
             anim.ResetTrigger("Attack");
             anim.ResetTrigger("DashAttack");
-
-            amountOfJumpsLeft--;
 
             if (!isWallSliding)
             {
@@ -145,10 +141,20 @@ public class Elena : MonoBehaviour
 
             if ((onWall || isWallSliding) && !onGround && moveInput.x != 0)
             {
-                Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * moveInput.x, wallJumpForce * wallJumpDirection.y);
-                rb.AddForce(forceToAdd, ForceMode2D.Impulse);
-                isWallSliding = false;
+                if (moveInput.x != 1 && isFacingRight)
+                {
+                    Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * -2, wallJumpForce * wallJumpDirection.y);
+                    rb.AddForce(forceToAdd, ForceMode2D.Impulse);
+                    isWallSliding = false;
+                }
+                else if (moveInput.x != -1 && !isFacingRight)
+                {
+                    Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * 2, wallJumpForce * wallJumpDirection.y);
+                    rb.AddForce(forceToAdd, ForceMode2D.Impulse);
+                    isWallSliding = false;
+                }
             }
+            amountOfJumpsLeft--;
         }
     }
 
@@ -173,7 +179,7 @@ public class Elena : MonoBehaviour
 
     void CheckIfCanJump()
     {
-        if (onGround || isWallSliding)
+        if ((onGround || isWallSliding) && rb.velocity.y <= 0.1)
         {
             amountOfJumpsLeft = amountOfJumps;
         }
@@ -209,7 +215,7 @@ public class Elena : MonoBehaviour
 
     void CheckIfCanWallSliding()
     {
-        if (onWall && !onGround && rb.velocity.y < 0)
+        if (onWall && !onGround)
         {
             isWallSliding = true;
         }
