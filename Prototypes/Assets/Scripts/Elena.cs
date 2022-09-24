@@ -27,25 +27,26 @@ public class Elena : MonoBehaviour
     [SerializeField] float dashPower;
     [SerializeField] float dashTime = 1f;
     [SerializeField] float dashCooldown = 1.5f;
-    [SerializeField] bool canDash;
-    [SerializeField] bool isDashing;
+    bool isDashing;
     float dashCooldownCounter;
+    bool canDash;
 
     [Header("Slide")]
     [SerializeField] float slidePower;
     [SerializeField] float slideTime;
     [SerializeField] float slideCooldown = 1.5f;
-    [SerializeField] bool canSlide;
-    [SerializeField] bool isSliding;
     float slideCooldownCounter;
+    bool canSlide;
+    bool isSliding;
 
     [Header("Attack")]
-    [SerializeField] float movementFreezeTimer;
     [SerializeField] float attackLeapPower;
     [SerializeField] float attackLeapTime;
-    [SerializeField] int attackAmount = 1;
+    [SerializeField] float secondAttackCooldown = .35f;
     [SerializeField] float attackCooldown;
-    [SerializeField] float attackCooldownCounter;
+    float movementFreezeTimer;
+    float secondAttackCooldownCounter;
+    float attackCooldownCounter;
     int attackAmountLeft;
     bool isAttacking;
 
@@ -55,6 +56,12 @@ public class Elena : MonoBehaviour
     [SerializeField] float wallSlideSpeed;
     [SerializeField] bool onWall;
     [SerializeField] bool isWallSliding;
+
+    [Header("Edge Grab")]
+    [SerializeField] Transform edgeCheck;
+    [SerializeField] float edgeCheckDistance;
+    [SerializeField] bool onEdge;
+    [SerializeField] bool isEdgeGrabing;
 
     Rigidbody2D rb;
     Animator anim;
@@ -71,7 +78,7 @@ public class Elena : MonoBehaviour
     {
         canDash = true;
         canSlide = true;
-        attackAmountLeft = attackAmount;
+        attackAmountLeft = 1;
         wallJumpDirection.Normalize();
     }
 
@@ -79,8 +86,7 @@ public class Elena : MonoBehaviour
     {
         CheckIfCanDash();
         CheckIfCanSlide();
-
-        attackCooldownCounter -= Time.deltaTime;
+        CheckIfCanAttack();
 
         if (isAttacking)
         {
@@ -96,6 +102,7 @@ public class Elena : MonoBehaviour
         Flip();
         CheckIfCanJump();
         CheckIfCanWallSliding();
+        CheckIfCanEdgeGrab();
         UpdateAnimations();
     }
 
@@ -110,13 +117,14 @@ public class Elena : MonoBehaviour
         anim.SetBool("onGround", onGround);
         anim.SetFloat("yVelocity", rb.velocity.y);
         anim.SetBool("isWallSliding", isWallSliding);
+        anim.SetBool("isEdgeGrabing", isEdgeGrabing);
     }
 
     void CheckSurroundings()
     {
         onGround = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, whatIsGround);
-        if (isFacingRight) onWall = Physics2D.Raycast(wallCheck.position, transform.right, wallCheckDistance, whatIsGround);
-        else onWall = Physics2D.Raycast(wallCheck.position, transform.right, -wallCheckDistance, whatIsGround);
+        onWall = Physics2D.Raycast(wallCheck.position, transform.localScale.x * transform.right, wallCheckDistance, whatIsGround);
+        onEdge = !Physics2D.Raycast(edgeCheck.position, transform.localScale.x * transform.right, edgeCheckDistance, whatIsGround); // When ray isn't touching the wall.
     }
 
     #region Input System
@@ -134,12 +142,13 @@ public class Elena : MonoBehaviour
             if (isDashing) anim.SetTrigger("DashAttack");
             else
             {
+                secondAttackCooldownCounter = secondAttackCooldown;
                 attackCooldownCounter = attackCooldown;
                 Debug.Log(attackAmountLeft);
                 anim.SetTrigger("Attack");
                 anim.SetFloat("attackAmount", attackAmountLeft);
                 attackAmountLeft++;
-                if (attackAmountLeft > 2) attackAmountLeft = attackAmount; 
+                if (attackAmountLeft > 2) attackAmountLeft = 1; 
             }
             StartCoroutine(AttackLeapCoroutine());
         }
@@ -158,21 +167,24 @@ public class Elena : MonoBehaviour
                 rb.velocity = new(rb.velocity.x, jumpPower);
             }
 
-            if ((onWall || isWallSliding) && !onGround && moveInput.x != 0)
+            if ((onWall || isWallSliding || isEdgeGrabing) && !onGround && moveInput.x != 0)
             {
                 if (moveInput.x != 1 && isFacingRight)
                 {
                     Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * -2, wallJumpForce * wallJumpDirection.y);
                     rb.AddForce(forceToAdd, ForceMode2D.Impulse);
                     isWallSliding = false;
+                    isEdgeGrabing = false;
                 }
                 else if (moveInput.x != -1 && !isFacingRight)
                 {
                     Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * 2, wallJumpForce * wallJumpDirection.y);
                     rb.AddForce(forceToAdd, ForceMode2D.Impulse);
                     isWallSliding = false;
+                    isEdgeGrabing = false;
                 }
             }
+
             amountOfJumpsLeft--;
         }
     }
@@ -196,11 +208,27 @@ public class Elena : MonoBehaviour
     }
     #endregion
 
+    #region Check If Can ...
+    void CheckIfCanAttack()
+    {
+        attackCooldownCounter -= Time.deltaTime;
+
+        secondAttackCooldownCounter -= Time.deltaTime;
+        if (secondAttackCooldownCounter <= 0)
+        {
+            attackAmountLeft = 1;
+        } 
+    }
+
     void CheckIfCanJump()
     {
-        if ((onGround || isWallSliding) && rb.velocity.y <= 0.1)
+        if (onGround && rb.velocity.y <= .1f)
         {
             amountOfJumpsLeft = amountOfJumps;
+        }
+        else if (isWallSliding && rb.velocity.y <= .1f)
+        {
+            amountOfJumpsLeft = 1;
         }
 
         if (amountOfJumpsLeft <= 0) canJump = false;
@@ -241,6 +269,16 @@ public class Elena : MonoBehaviour
         else isWallSliding = false;
     }
 
+    void CheckIfCanEdgeGrab()
+    {
+        if (onWall && onEdge && !onGround)
+        {
+            isEdgeGrabing = true;
+        }
+        else isEdgeGrabing = false;
+    }
+    #endregion
+
     void Movement()
     {
         if (onGround) rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
@@ -258,7 +296,9 @@ public class Elena : MonoBehaviour
         {
             rb.velocity = new Vector2(rb.velocity.x * airDragMultiplier, rb.velocity.y);
         }
-        if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
+
+        if (isEdgeGrabing) rb.velocity = Vector2.zero;
+        else if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
     }
 
     void Flip()
@@ -283,6 +323,7 @@ public class Elena : MonoBehaviour
         return Mathf.Abs(rb.velocity.x) > Mathf.Epsilon;
     }
 
+    #region Coroutines
     IEnumerator DashCoroutine()
     {
         isDashing = true;
@@ -333,10 +374,12 @@ public class Elena : MonoBehaviour
             yield return null;
         }
     }
+    #endregion
 
     private void OnDrawGizmosSelected()
     {
         Gizmos.DrawSphere(groundCheck.position, groundCheckRadius);
-        Gizmos.DrawLine(wallCheck.position, new Vector3(wallCheck.position.x + wallCheckDistance, wallCheck.position.y, wallCheck.position.z));
+        Gizmos.DrawLine(wallCheck.position, new Vector2(wallCheck.position.x + wallCheckDistance, wallCheck.position.y));
+        Gizmos.DrawLine(edgeCheck.position, new Vector2(edgeCheck.position.x + edgeCheckDistance, edgeCheck.position.y));
     }
 }
