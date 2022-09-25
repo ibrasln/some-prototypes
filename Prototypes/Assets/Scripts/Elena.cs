@@ -166,23 +166,26 @@ public class Elena : MonoBehaviour
                 Debug.Log("Jump from Ground");
                 rb.velocity = new(rb.velocity.x, jumpPower);
             }
-
-            if ((onWall || isWallSliding || isEdgeGrabing) && !onGround && moveInput.x != 0)
+            else if ((onWall || isWallSliding) && !onGround && moveInput.x != 0)
             {
                 if (moveInput.x != 1 && isFacingRight)
                 {
                     Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * -2, wallJumpForce * wallJumpDirection.y);
                     rb.AddForce(forceToAdd, ForceMode2D.Impulse);
                     isWallSliding = false;
-                    isEdgeGrabing = false;
                 }
                 else if (moveInput.x != -1 && !isFacingRight)
                 {
                     Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x * 2, wallJumpForce * wallJumpDirection.y);
                     rb.AddForce(forceToAdd, ForceMode2D.Impulse);
                     isWallSliding = false;
-                    isEdgeGrabing = false;
                 }
+            }
+            else if (isEdgeGrabing)
+            {
+                Vector2 forceToAdd = new(wallJumpForce * wallJumpDirection.x, wallJumpForce * wallJumpDirection.y);
+                rb.AddForce(forceToAdd, ForceMode2D.Impulse);
+                isEdgeGrabing = false;
             }
 
             amountOfJumpsLeft--;
@@ -262,7 +265,7 @@ public class Elena : MonoBehaviour
 
     void CheckIfCanWallSliding()
     {
-        if (onWall && !onGround)
+        if (onWall && !onGround && !isEdgeGrabing)
         {
             isWallSliding = true;
         }
@@ -273,16 +276,26 @@ public class Elena : MonoBehaviour
     {
         if (onWall && onEdge && !onGround)
         {
+            rb.gravityScale = 0;
             isEdgeGrabing = true;
         }
-        else isEdgeGrabing = false;
+        else
+        {
+            rb.gravityScale = 5;
+            isEdgeGrabing = false;
+        }
     }
     #endregion
 
     void Movement()
     {
         if (onGround) rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
-        else if (!onGround && !isWallSliding && moveInput.x != 0)
+
+        else if (isEdgeGrabing) return;
+        
+        else if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
+        
+        else if (!onGround && !isWallSliding && !isEdgeGrabing && moveInput.x != 0)
         {
             Vector2 forceToAdd = new(movementForceInAir * moveInput.x, 0);
             rb.AddForce(forceToAdd);
@@ -292,18 +305,18 @@ public class Elena : MonoBehaviour
                 rb.velocity = new Vector2(movementSpeed * moveInput.x, rb.velocity.y);
             }
         }
-        else if (!onGround && !isWallSliding && moveInput.x == 0)
+        
+        else if (!onGround && !isWallSliding && !isEdgeGrabing && moveInput.x == 0)
         {
             rb.velocity = new Vector2(rb.velocity.x * airDragMultiplier, rb.velocity.y);
         }
 
-        if (isEdgeGrabing) rb.velocity = Vector2.zero;
-        else if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
+        Debug.Log(rb.velocity);
     }
 
     void Flip()
     {
-        if (!isWallSliding)
+        if (!isWallSliding && !isEdgeGrabing)
         {
             if (moveInput.x < 0)
             {
@@ -379,7 +392,7 @@ public class Elena : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Gizmos.DrawSphere(groundCheck.position, groundCheckRadius);
-        Gizmos.DrawLine(wallCheck.position, new Vector2(wallCheck.position.x + wallCheckDistance, wallCheck.position.y));
-        Gizmos.DrawLine(edgeCheck.position, new Vector2(edgeCheck.position.x + edgeCheckDistance, edgeCheck.position.y));
+        Gizmos.DrawLine(wallCheck.position, new Vector2((wallCheck.position.x + wallCheckDistance) * transform.localScale.x, wallCheck.position.y));
+        Gizmos.DrawLine(edgeCheck.position, new Vector2((edgeCheck.position.x + edgeCheckDistance) * transform.localScale.x, edgeCheck.position.y));
     }
 }
