@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
 public class Elena : MonoBehaviour
 {
@@ -57,6 +58,12 @@ public class Elena : MonoBehaviour
     [SerializeField] bool onWall;
     [SerializeField] bool isWallSliding;
 
+    [Header("Ladder Climb")]
+    [SerializeField] LayerMask whatIsLadder;
+    [SerializeField] float climbSpeed;
+    [SerializeField] bool isClimbing;
+    [SerializeField] bool onLadder;
+
     Rigidbody2D rb;
     Animator anim;
     CapsuleCollider2D col;
@@ -96,6 +103,7 @@ public class Elena : MonoBehaviour
         Flip();
         CheckIfCanJump();
         CheckIfCanWallSliding();
+        CheckIfCanClimb();
         UpdateAnimations();
     }
 
@@ -110,12 +118,14 @@ public class Elena : MonoBehaviour
         anim.SetBool("onGround", onGround);
         anim.SetFloat("yVelocity", rb.velocity.y);
         anim.SetBool("isWallSliding", isWallSliding);
+        anim.SetBool("isClimbing", isClimbing);
     }
 
     void CheckSurroundings()
     {
         onGround = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, whatIsGround);
         onWall = Physics2D.Raycast(wallCheck.position, transform.localScale.x * transform.right, wallCheckDistance, whatIsGround);
+        onLadder = col.IsTouchingLayers(whatIsLadder);
     }
 
     #region Input System
@@ -135,9 +145,10 @@ public class Elena : MonoBehaviour
             {
                 secondAttackCooldownCounter = secondAttackCooldown;
                 attackCooldownCounter = attackCooldown;
-                Debug.Log(attackAmountLeft);
+
                 anim.SetTrigger("Attack");
                 anim.SetFloat("attackAmount", attackAmountLeft);
+
                 attackAmountLeft++;
                 if (attackAmountLeft > 2) attackAmountLeft = 1; 
             }
@@ -250,21 +261,39 @@ public class Elena : MonoBehaviour
 
     void CheckIfCanWallSliding()
     {
-        if (onWall && !onGround)
+        if (onWall && !onGround && !isClimbing)
         {
             isWallSliding = true;
         }
         else isWallSliding = false;
     }
+
+    void CheckIfCanClimb()
+    {
+        if (onLadder)
+        {
+            if (moveInput.y != 0)
+            {
+                rb.gravityScale = 0;
+                isClimbing = true;
+            }
+        }
+        else
+        {
+            rb.gravityScale = 5;
+            isClimbing = false;
+        }
+    }
+
     #endregion
 
     void Movement()
     {
-        if (onGround) rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
+        if (onGround && !isClimbing) rb.velocity = new(moveInput.x * movementSpeed, rb.velocity.y);
         
         else if (isWallSliding && rb.velocity.y < -wallSlideSpeed) rb.velocity = new(rb.velocity.x, -wallSlideSpeed);
         
-        else if (!onGround && !isWallSliding && moveInput.x != 0)
+        else if (!onGround && !isWallSliding && !isClimbing && moveInput.x != 0)
         {
             Vector2 forceToAdd = new(movementForceInAir * moveInput.x, 0);
             rb.AddForce(forceToAdd);
@@ -275,17 +304,20 @@ public class Elena : MonoBehaviour
             }
         }
         
-        else if (!onGround && !isWallSliding && moveInput.x == 0)
+        else if (!onGround && !isWallSliding && !isClimbing && moveInput.x == 0)
         {
             rb.velocity = new Vector2(rb.velocity.x * airDragMultiplier, rb.velocity.y);
-        }
+        } 
 
-        Debug.Log(rb.velocity);
+        else if (isClimbing)
+        {
+            rb.velocity = new Vector2(0, climbSpeed * moveInput.y);
+        }
     }
 
     void Flip()
     {
-        if (!isWallSliding)
+        if (!isWallSliding && !isClimbing)
         {
             if (moveInput.x < 0)
             {
